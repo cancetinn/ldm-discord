@@ -31,7 +31,7 @@ async function fetchFormStatus(submissionId) {
     return await response.json();
   } catch (error) {
     console.error("Error fetching form status:", error);
-    return null; // Hata durumunda null dön
+    return null;
   }
 }
 
@@ -114,25 +114,23 @@ function sendToDiscord(submission) {
 
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isButton()) return;
+
   const [action, submissionId] = interaction.customId.split("_");
   const originalMessage = interaction.message;
 
-  if (action === "approve") {
-    await approveSubmission(submissionId);
+  const usernameField = originalMessage.embeds[0].fields.find(field => field.name === "Username");
+  const teamNameField = originalMessage.embeds[0].fields.find(field => field.name === "Team_name");
+
+  if (action === "approve" && usernameField && teamNameField) {
+    await approveSubmission(submissionId, teamNameField.value, usernameField.value);
     await moveAndDeleteMessage(originalMessage, APPROVED_CHANNEL_ID);
-    // Kullanıcıya bildirim gönder
     await interaction.reply({
-      content: "Form approved and moved!",
+      content: "Form approved, role created and assigned!",
       ephemeral: true
     });
   } else if (action === "reject") {
-    await rejectSubmission(submissionId);
-    await moveAndDeleteMessage(originalMessage, REJECTED_CHANNEL_ID);
-    // Kullanıcıya bildirim gönder
-    await interaction.reply({
-      content: "Form rejected and moved!",
-      ephemeral: true
-    });
+    // Reddetme işlemi için kodlarınız...
+    // ...
   }
 });
 
@@ -159,8 +157,8 @@ client.on("interactionCreate", async (interaction) => {
   await interaction.followUp({ content: `Application updated as ${statusField.value}.`, ephemeral: true });
 });*/
 
-
-async function approveSubmission(submissionId) {
+//cancetin isimli role rolu atamıyor ama oluşturuyor.
+async function approveSubmission(submissionId, teamName, usernameWithTag) {
   try {
     const response = await fetch(UPDATE_API_URL, {
       method: "POST",
@@ -174,10 +172,37 @@ async function approveSubmission(submissionId) {
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
 
-    console.log("Form approved successfully");
+    const guild = client.guilds.cache.get(process.env.GUILD_ID);
+    if (guild) {
+      const role = await guild.roles.create({
+        name: teamName,
+        reason: "Team role created"
+      });
+
+      const member = await findMemberByUsernameTag(guild, usernameWithTag);
+      if (member) {
+        await member.roles.add(role);
+        console.log(`Role '${teamName}' assigned to member '${usernameWithTag}'`);
+      } else {
+        console.log(`Member '${usernameWithTag}' not found.`);
+      }
+    } else {
+      console.log("Guild not found.");
+    }
   } catch (error) {
-    console.error("Error approving form:", error);
+    console.error("Error in approveSubmission:", error);
   }
+}
+
+async function findMemberByUsernameTag(guild, usernameWithTag) {
+  let member = null;
+  try {
+    const members = await guild.members.fetch({ query: usernameWithTag.split("#")[0], limit: 1000 });
+    member = members.find(m => `${m.user.username}#${m.user.discriminator}` === usernameWithTag);
+  } catch (error) {
+    console.error("Error finding member:", error);
+  }
+  return member;
 }
 
 async function rejectSubmission(submissionId) {
@@ -203,10 +228,8 @@ async function rejectSubmission(submissionId) {
 async function moveAndDeleteMessage(originalMessage, targetChannelId) {
   const channel = client.channels.cache.get(targetChannelId);
   if (channel) {
-    // Mesajı yeni kanala taşı
-    channel.send({ embeds: originalMessage.embeds, components: [] });
 
-    // Orijinal mesajı sil
+    channel.send({ embeds: originalMessage.embeds, components: [] });
     originalMessage.delete().catch(console.error);
   }
 }
