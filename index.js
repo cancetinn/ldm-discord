@@ -14,12 +14,11 @@ const client = new Client({
   intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES],
 });
 
-const REST_API_URL = "http://lidoma-new.local/wp-json/appforms/v1/form-data";
-const UPDATE_API_URL =
-  "http://lidoma-new.local/wp-json/appforms/v1/update-form";
-const CHANNEL_ID = "1172185965624836176";
-const APPROVED_CHANNEL_ID = "1172184660441313432";
-const REJECTED_CHANNEL_ID = "1172184691722432553";
+const REST_API_URL = process.env.REST_API_URL;
+const UPDATE_API_URL = process.env.UPDATE_API_URL;
+const CHANNEL_ID = process.env.CHANNEL_ID;
+const APPROVED_CHANNEL_ID = process.env.APPROVED_CHANNEL_ID;
+const REJECTED_CHANNEL_ID = process.env.REJECTED_CHANNEL_ID;
 let lastFormTime = "";
 
 async function fetchFromWordPressAPI(url) {
