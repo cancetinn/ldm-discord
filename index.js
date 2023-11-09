@@ -3,14 +3,15 @@ import {
   Intents,
   MessageEmbed,
   MessageActionRow,
-  MessageButton,
+  MessageButton
 } from "discord.js";
 import fetch from "node-fetch";
-import dotenv from 'dotenv';
+import dotenv from "dotenv";
+
 dotenv.config();
 
 const client = new Client({
-  intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES],
+  intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES]
 });
 const REST_API_URL = "http://lidoma-new.local/wp-json/appforms/v1/form-data";
 const UPDATE_API_URL =
@@ -67,7 +68,7 @@ function sendToDiscord(submission) {
     return {
       name: key.charAt(0).toUpperCase() + key.slice(1),
       value: String(submission[key]),
-      inline: false,
+      inline: false
     };
   });
 
@@ -86,7 +87,7 @@ function sendToDiscord(submission) {
     new MessageButton()
       .setCustomId("reject_" + submission.id)
       .setLabel("Reject")
-      .setStyle("DANGER"),
+      .setStyle("DANGER")
   );
 
   const channel = client.channels.cache.get(CHANNEL_ID);
@@ -106,13 +107,13 @@ client.on("interactionCreate", async (interaction) => {
       await interaction.followUp({
         content: "Form approved!",
         components: [],
-        ephemeral: true,
+        ephemeral: true
       });
     } else {
       await interaction.reply({
         content: "Form approved!",
         components: [],
-        ephemeral: true,
+        ephemeral: true
       });
     }
   } else if (action === "reject") {
@@ -121,13 +122,13 @@ client.on("interactionCreate", async (interaction) => {
       await interaction.followUp({
         content: "Form rejected!",
         components: [],
-        ephemeral: true,
+        ephemeral: true
       });
     } else {
       await interaction.reply({
         content: "Form rejected!",
         components: [],
-        ephemeral: true,
+        ephemeral: true
       });
     }
   }
@@ -159,9 +160,9 @@ async function approveSubmission(submissionId) {
     const response = await fetch(UPDATE_API_URL, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type": "application/json"
       },
-      body: JSON.stringify({ submissionId, status: "approved" }),
+      body: JSON.stringify({ submissionId, status: "approved" })
     });
 
     if (!response.ok) {
@@ -179,9 +180,9 @@ async function rejectSubmission(submissionId) {
     const response = await fetch(UPDATE_API_URL, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type": "application/json"
       },
-      body: JSON.stringify({ submissionId, status: "rejected" }),
+      body: JSON.stringify({ submissionId, status: "rejected" })
     });
 
     if (!response.ok) {
