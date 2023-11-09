@@ -13,6 +13,7 @@ dotenv.config();
 const client = new Client({
   intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES],
 });
+
 const REST_API_URL = "http://lidoma-new.local/wp-json/appforms/v1/form-data";
 const UPDATE_API_URL =
   "http://lidoma-new.local/wp-json/appforms/v1/update-form";
@@ -22,64 +23,27 @@ const REJECTED_CHANNEL_ID = "1172184691722432553";
 let lastFormTime = "";
 
 async function fetchFromWordPressAPI(url) {
-  try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status} for URL: ${url}`);
-    }
-    return response.json();
-  } catch (error) {
-    console.error("API request error:", error);
-    throw error; // Hata durumunda fırlat
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`HTTP error! Status: ${response.status} for URL: ${url}`);
   }
+  return response.json();
 }
 
 async function initializeLastFormTime() {
-  try {
-    const submissions = await fetchFromWordPressAPI(REST_API_URL);
-    if (submissions && submissions.length > 0) {
-      lastFormTime = submissions[0].time;
-    }
-  } catch (error) {
-    console.error("Error initializing last form time:", error);
+  const submissions = await fetchFromWordPressAPI(REST_API_URL);
+  if (submissions && submissions.length > 0) {
+    lastFormTime = submissions[0].time;
   }
 }
 
-client.once("ready", () => {
-  console.log(`Logged in as ${client.user.tag}!`);
-  initializeLastFormTime().then(() => {
-    setInterval(checkForNewSubmission, 10000);
-  });
-});
-
 async function checkForNewSubmission() {
-  try {
-    const submissions = await fetchFromWordPressAPI(REST_API_URL);
-    for (const submission of submissions) {
-      if (new Date(submission.time) > new Date(lastFormTime)) {
-        lastFormTime = submission.time;
-        sendToDiscord(submission);
-      }
-      const discordMessage = await findDiscordMessageForSubmission(
-        submission.id,
-      );
-      if (discordMessage) {
-        const statusField = discordMessage.embeds[0].fields.find(
-          (field) => field.name === "Status",
-        );
-        if (statusField && statusField.value !== submission.status) {
-          await moveAndEditMessage(
-            discordMessage,
-            submission.status === "approved"
-              ? APPROVED_CHANNEL_ID
-              : REJECTED_CHANNEL_ID,
-            submission.status,
-          );
-        }
-      }
+  const submissions = await fetchFromWordPressAPI(REST_API_URL);
+  for (const submission of submissions) {
+    if (new Date(submission.time) > new Date(lastFormTime)) {
+      lastFormTime = submission.time;
+      sendToDiscord(submission);
     }
-  } catch (error) {
-    console.error("Error checking for new submission:", error);
   }
 }
 
@@ -92,12 +56,22 @@ function sendToDiscord(submission) {
       inline: false,
     }));
 
+  const color = submission.status === "approved" ? "#57F287" : "#1F8B4C";
+  const statusEmoji = submission.status === "approved" ? "🟩" : "🔴";
+
   const embed = new MessageEmbed()
     .setTitle("New Form Submission")
-    .setColor("#0099ff")
+    .setColor(color)
     .addFields(fields)
     .setTimestamp(new Date(submission.time))
     .setFooter({ text: "LIDOMA BOT" });
+
+  if (["approved", "rejected"].includes(submission.status)) {
+    embed.addField(
+      "Status",
+      `${statusEmoji} ${submission.status.toUpperCase()}`,
+    );
+  }
 
   const row = new MessageActionRow().addComponents(
     new MessageButton()
@@ -111,10 +85,15 @@ function sendToDiscord(submission) {
   );
 
   const channel = client.channels.cache.get(CHANNEL_ID);
-  if (channel) {
-    channel.send({ embeds: [embed], components: [row] });
-  }
+  channel?.send({ embeds: [embed], components: [row] });
 }
+
+client.once("ready", () => {
+  console.log(`Logged in as ${client.user.tag}!`);
+  initializeLastFormTime().then(() => {
+    setInterval(checkForNewSubmission, 10000);
+  });
+});
 
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isButton()) return;
@@ -139,11 +118,7 @@ client.on("interactionCreate", async (interaction) => {
 
   try {
     if (action === "approve") {
-      await approveSubmission(
-        submissionId,
-        teamNameField.value,
-        usernameField.value,
-      );
+      await updateSubmissionStatus(submissionId, "approved");
       await moveAndEditMessage(
         originalMessage,
         APPROVED_CHANNEL_ID,
@@ -154,7 +129,7 @@ client.on("interactionCreate", async (interaction) => {
         ephemeral: true,
       });
     } else if (action === "reject") {
-      await rejectSubmission(submissionId);
+      await updateSubmissionStatus(submissionId, "rejected");
       await moveAndEditMessage(
         originalMessage,
         REJECTED_CHANNEL_ID,
@@ -175,99 +150,41 @@ client.on("interactionCreate", async (interaction) => {
   }
 });
 
-async function moveAndEditMessage(originalMessage, targetChannelId, status) {
-  const updatedEmbed = new MessageEmbed(originalMessage.embeds[0])
-    .setColor(status === "approved" ? "#00FF00" : "#FF0000")
-    .spliceFields(0, 1, {
-      name: "Status",
-      value: status.charAt(0).toUpperCase() + status.slice(1),
-    });
+async function moveAndEditMessage(originalMessage, targetChannelId, newStatus) {
+  // Status emoji ve renk ayarları
+  const color = newStatus === "Approved" ? "#57F287" : "#ED4245";
+  const statusEmoji = newStatus === "Approved" ? "✅" : "❌";
+
+  let statusField = originalMessage.embeds[0].fields.find(
+    (field) => field.name === "Status",
+  );
+  const updatedEmbed = new MessageEmbed(originalMessage.embeds[0]).setColor(
+    color,
+  );
+
+  if (statusField) {
+    statusField.value = `${statusEmoji} ${newStatus}`;
+  } else {
+    updatedEmbed.addField("Status", `${statusEmoji} ${newStatus}`);
+  }
 
   const channel = client.channels.cache.get(targetChannelId);
   if (channel) {
     await channel.send({ embeds: [updatedEmbed], components: [] });
-    await originalMessage.delete().catch(console.error);
+    await originalMessage.delete();
   }
 }
 
-async function approveSubmission(submissionId, teamName, usernameWithTag) {
-  try {
-    const response = await fetch(UPDATE_API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ submissionId, status: "approved" }),
-    });
+async function updateSubmissionStatus(submissionId, status) {
+  const response = await fetch(UPDATE_API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ submissionId, status }),
+  });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`);
-    }
-
-    const guild = client.guilds.cache.get(process.env.GUILD_ID);
-    if (guild) {
-      const role = await guild.roles.create({
-        name: teamName,
-        reason: "Team role created",
-      });
-      const member = await findMemberByUsernameTag(guild, usernameWithTag);
-      if (member) {
-        await member.roles.add(role);
-      }
-    }
-  } catch (error) {
-    console.error("Error in approveSubmission:", error);
+  if (!response.ok) {
+    throw new Error(`HTTP error! Status: ${response.status}`);
   }
-}
-
-async function findMemberByUsernameTag(guild, usernameWithTag) {
-  try {
-    const members = await guild.members.fetch({
-      query: usernameWithTag.split("#")[0],
-      limit: 1000,
-    });
-    return members.find(
-      (m) => `${m.user.username}#${m.user.discriminator}` === usernameWithTag,
-    );
-  } catch (error) {
-    console.error("Error finding member:", error);
-    return null;
-  }
-}
-
-async function rejectSubmission(submissionId) {
-  try {
-    const response = await fetch(UPDATE_API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ submissionId, status: "rejected" }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`);
-    }
-  } catch (error) {
-    console.error("Error rejecting form:", error);
-  }
-}
-
-async function findDiscordMessageForSubmission(submissionId) {
-  const channel = client.channels.cache.get(CHANNEL_ID);
-  if (!channel) return null;
-
-  let foundMessage = null;
-  try {
-    const messages = await channel.messages.fetch({ limit: 100 });
-    foundMessage = messages.find((msg) =>
-      msg.embeds.some((embed) =>
-        embed.fields.some(
-          (field) =>
-            field.name === "Submission ID" && field.value === submissionId,
-        ),
-      ),
-    );
-  } catch (error) {
-    console.error("Error finding Discord message for submission:", error);
-  }
-  return foundMessage;
 }
 
 client.login(process.env.CLIENT_BOT_TOKEN);
