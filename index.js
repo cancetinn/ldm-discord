@@ -6,6 +6,8 @@ import {
   MessageButton,
 } from "discord.js";
 import fetch from "node-fetch";
+import dotenv from 'dotenv';
+dotenv.config();
 
 const client = new Client({
   intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES],
@@ -192,6 +194,5 @@ async function rejectSubmission(submissionId) {
   }
 }
 
-client.login(
-  "MTE2OTIxOTc5NDc1MTQ2NzU1MQ.G2jgex.yea7hnUvGzsS9Iqid0ouJcwK__ndOedEvYtHSA",
+client.login(process.env.CLIENT_BOT_TOKEN
 );

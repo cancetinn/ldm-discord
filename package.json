@@ -9,6 +9,7 @@
   "dependencies": {
     "btoa": "^1.2.1",
     "discord.js": "^13.16.0",
+    "dotenv": "^16.3.1",
     "node-fetch": "^3.3.2"
   },
   "author": "Your Name",
