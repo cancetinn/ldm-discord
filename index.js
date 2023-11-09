@@ -121,18 +121,44 @@ client.on("interactionCreate", async (interaction) => {
   const usernameField = originalMessage.embeds[0].fields.find(field => field.name === "Username");
   const teamNameField = originalMessage.embeds[0].fields.find(field => field.name === "Team_name");
 
-  if (action === "approve" && usernameField && teamNameField) {
-    await approveSubmission(submissionId, teamNameField.value, usernameField.value);
-    await moveAndDeleteMessage(originalMessage, APPROVED_CHANNEL_ID);
+  if (!usernameField || !teamNameField) {
+    await interaction.reply({ content: "Required fields not found in the message.", ephemeral: true });
+    return;
+  }
+
+  try {
+    if (action === "approve") {
+      await approveSubmission(submissionId, teamNameField.value, usernameField.value);
+      await moveAndEditMessage(originalMessage, APPROVED_CHANNEL_ID, "Approved");
+      await interaction.reply({
+        content: "Form approved, role created and assigned, and moved to the approved channel.",
+        ephemeral: true
+      });
+    } else if (action === "reject") {
+      await rejectSubmission(submissionId);
+      await moveAndEditMessage(originalMessage, REJECTED_CHANNEL_ID, "Rejected");
+      await interaction.reply({
+        content: "Form rejected and moved to the rejected channel.",
+        ephemeral: true
+      });
+    }
+  } catch (error) {
+    console.error("Error in interaction:", error);
     await interaction.reply({
-      content: "Form approved, role created and assigned!",
+      content: "There was an error processing the form. Please try again later.",
       ephemeral: true
     });
-  } else if (action === "reject") {
-    // Reddetme işlemi için kodlarınız...
-    // ...
   }
 });
+
+async function moveAndEditMessage(originalMessage, targetChannelId, status) {
+  const updatedEmbed = new MessageEmbed(originalMessage.embeds[0]).addFields({ name: "Status", value: status });
+  const channel = client.channels.cache.get(targetChannelId);
+  if (channel) {
+    await channel.send({ embeds: [updatedEmbed], components: [] });
+    await originalMessage.delete().catch(console.error);
+  }
+}
 
 
 //bu kısıma bakacağım
@@ -222,15 +248,6 @@ async function rejectSubmission(submissionId) {
     console.log("Form rejected successfully");
   } catch (error) {
     console.error("Error rejecting form:", error);
-  }
-}
-
-async function moveAndDeleteMessage(originalMessage, targetChannelId) {
-  const channel = client.channels.cache.get(targetChannelId);
-  if (channel) {
-
-    channel.send({ embeds: originalMessage.embeds, components: [] });
-    originalMessage.delete().catch(console.error);
   }
 }
 
