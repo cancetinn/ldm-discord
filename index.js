@@ -52,7 +52,7 @@ async function checkForNewSubmission() {
 
 function sendToDiscord(submission) {
   const fields = Object.keys(submission)
-    .filter((key) => key !== "status")
+    .filter((key) => key !== "status" && submission[key])
     .map((key) => ({
       name: key.charAt(0).toUpperCase() + key.slice(1),
       value: String(submission[key]),
@@ -104,23 +104,32 @@ client.on("interactionCreate", async (interaction) => {
   const [action, submissionId] = interaction.customId.split("_");
   const originalMessage = interaction.message;
 
-  const usernameField = originalMessage.embeds[0].fields.find(
-    (field) => field.name === "Username",
-  );
   const teamNameField = originalMessage.embeds[0].fields.find(
     (field) => field.name === "Team_name",
   );
 
-  if (!usernameField || !teamNameField) {
+  if (!teamNameField) {
     await interaction.reply({
-      content: "Required fields not found in the message.",
+      content: "Team name field not found in the message.",
       ephemeral: true,
     });
     return;
   }
 
-  const username = usernameField.value;
   const teamName = teamNameField.value;
+  const discordUsernames = [
+    "player1_discord",
+    "player2_discord",
+    "player3_discord",
+    "player4_discord",
+  ]
+    .map(
+      (field) =>
+        originalMessage.embeds[0].fields.find(
+          (f) => f.name.toLowerCase() === field,
+        )?.value,
+    )
+    .filter((username) => username);
 
   try {
     if (action === "approve") {
@@ -131,74 +140,60 @@ client.on("interactionCreate", async (interaction) => {
         "Approved",
       );
 
-      const [name, discriminator] = username.includes("#")
-        ? username.split("#")
-        : [username, null];
-
-      const member = interaction.guild.members.cache.find((m) =>
-        discriminator
-          ? m.user.username === name && m.user.discriminator === discriminator
-          : m.user.username === name,
-      );
-
-      if (member) {
-        let role = interaction.guild.roles.cache.find(
-          (r) => r.name === teamName,
-        );
-        if (!role) {
-          role = await interaction.guild.roles.create({
-            name: teamName,
-            //color: "BLUE",
-          });
-        }
-
-        await member.roles.add(role);
-
-        let category = interaction.guild.channels.cache.find(
-          (c) => c.name === teamName && c.type === "GUILD_CATEGORY",
-        );
-        if (!category) {
-          category = await interaction.guild.channels.create(teamName, {
-            type: "GUILD_CATEGORY",
-            permissionOverwrites: [
-              {
-                id: role.id,
-                allow: ["VIEW_CHANNEL"],
-              },
-              {
-                id: interaction.guild.roles.everyone,
-                deny: ["VIEW_CHANNEL"],
-              },
-            ],
-          });
-        }
-
-        const textChannel = await interaction.guild.channels.create(
-          `${teamName}-text`,
-          {
-            type: "GUILD_TEXT",
-            parent: category.id,
-          },
-        );
-
-        const voiceChannel = await interaction.guild.channels.create(
-          `${teamName}-voice`,
-          {
-            type: "GUILD_VOICE",
-            parent: category.id,
-          },
-        );
-
-        await interaction.reply({
-          content: `Form approved and role '${teamName}' assigned to the user ${username}. Team channels created.`,
-          ephemeral: true,
-        });
-      } else {
-        await interaction.reply({
-          content: `User '${username}' not found in the guild.`,
-          ephemeral: true,
+      let role = interaction.guild.roles.cache.find((r) => r.name === teamName);
+      if (!role) {
+        role = await interaction.guild.roles.create({
+          name: teamName,
         });
       }
+
+      for (const username of discordUsernames) {
+        const members = interaction.guild.members.cache.filter(
+          (m) => m.user.username === username,
+        );
+
+        if (members.size > 0) {
+          members.forEach(async (member) => {
+            await member.roles.add(role);
+          });
+        } else {
+          console.log(`User '${username}' not found in the guild.`);
+        }
+      }
+
+      let category = interaction.guild.channels.cache.find(
+        (c) => c.name === teamName && c.type === "GUILD_CATEGORY",
+      );
+      if (!category) {
+        category = await interaction.guild.channels.create(teamName, {
+          type: "GUILD_CATEGORY",
+          permissionOverwrites: [
+            {
+              id: role.id,
+              allow: ["VIEW_CHANNEL"],
+            },
+            {
+              id: interaction.guild.roles.everyone,
+              deny: ["VIEW_CHANNEL"],
+            },
+          ],
+        });
+      }
+
+      await interaction.guild.channels.create(`📜‎║‎chat‎║`, {
+        type: "GUILD_TEXT",
+        parent: category.id,
+      });
+
+      await interaction.guild.channels.create(`🔊‎║‎voice‎║`, {
+        type: "GUILD_VOICE",
+        parent: category.id,
+      });
+
+      await interaction.reply({
+        content: `Form approved, role '${teamName}' assigned, and team channels created.`,
+        ephemeral: true,
+      });
     } else if (action === "reject") {
       await updateSubmissionStatus(submissionId, "rejected");
       await moveAndEditMessage(
