@@ -154,8 +154,43 @@ client.on("interactionCreate", async (interaction) => {
 
         await member.roles.add(role);
 
+        let category = interaction.guild.channels.cache.find(
+          (c) => c.name === teamName && c.type === "GUILD_CATEGORY",
+        );
+        if (!category) {
+          category = await interaction.guild.channels.create(teamName, {
+            type: "GUILD_CATEGORY",
+            permissionOverwrites: [
+              {
+                id: role.id,
+                allow: ["VIEW_CHANNEL"],
+              },
+              {
+                id: interaction.guild.roles.everyone,
+                deny: ["VIEW_CHANNEL"],
+              },
+            ],
+          });
+        }
+
+        const textChannel = await interaction.guild.channels.create(
+          `${teamName}-text`,
+          {
+            type: "GUILD_TEXT",
+            parent: category.id,
+          },
+        );
+
+        const voiceChannel = await interaction.guild.channels.create(
+          `${teamName}-voice`,
+          {
+            type: "GUILD_VOICE",
+            parent: category.id,
+          },
+        );
+
         await interaction.reply({
-          content: `Form approved and role '${teamName}' assigned to the user ${username}.`,
+          content: `Form approved and role '${teamName}' assigned to the user ${username}. Team channels created.`,
           ephemeral: true,
         });
       } else {
