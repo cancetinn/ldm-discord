@@ -11,7 +11,11 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const client = new Client({
-  intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES],
+  intents: [
+    Intents.FLAGS.GUILDS,
+    Intents.FLAGS.GUILD_MESSAGES,
+    Intents.FLAGS.GUILD_MEMBERS,
+  ],
 });
 
 const REST_API_URL = process.env.REST_API_URL;
@@ -115,6 +119,9 @@ client.on("interactionCreate", async (interaction) => {
     return;
   }
 
+  const username = usernameField.value;
+  const teamName = teamNameField.value;
+
   try {
     if (action === "approve") {
       await updateSubmissionStatus(submissionId, "approved");
@@ -123,10 +130,40 @@ client.on("interactionCreate", async (interaction) => {
         APPROVED_CHANNEL_ID,
         "Approved",
       );
-      await interaction.reply({
-        content: "Form approved and moved to the approved channel.",
-        ephemeral: true,
-      });
+
+      const [name, discriminator] = username.includes("#")
+        ? username.split("#")
+        : [username, null];
+
+      const member = interaction.guild.members.cache.find((m) =>
+        discriminator
+          ? m.user.username === name && m.user.discriminator === discriminator
+          : m.user.username === name,
+      );
+
+      if (member) {
+        let role = interaction.guild.roles.cache.find(
+          (r) => r.name === teamName,
+        );
+        if (!role) {
+          role = await interaction.guild.roles.create({
+            name: teamName,
+            //color: "BLUE",
+          });
+        }
+
+        await member.roles.add(role);
+
+        await interaction.reply({
+          content: `Form approved and role '${teamName}' assigned to the user ${username}.`,
+          ephemeral: true,
+        });
+      } else {
+        await interaction.reply({
+          content: `User '${username}' not found in the guild.`,
+          ephemeral: true,
+        });
+      }
     } else if (action === "reject") {
       await updateSubmissionStatus(submissionId, "rejected");
       await moveAndEditMessage(
@@ -150,7 +187,6 @@ client.on("interactionCreate", async (interaction) => {
 });
 
 async function moveAndEditMessage(originalMessage, targetChannelId, newStatus) {
-  // Status emoji ve renk ayarları
   const color = newStatus === "Approved" ? "#57F287" : "#ED4245";
   const statusEmoji = newStatus === "Approved" ? "✅" : "❌";
 
