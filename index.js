@@ -25,6 +25,14 @@ const APPROVED_CHANNEL_ID = process.env.APPROVED_CHANNEL_ID;
 const REJECTED_CHANNEL_ID = process.env.REJECTED_CHANNEL_ID;
 let lastFormTime = "";
 
+client.once("ready", () => {
+  console.log(`Logged in as ${client.user.tag}!`);
+  initializeLastFormTime().then(() => {
+    setInterval(checkForNewSubmission, 10000);
+    setInterval(checkAndAssignRoles, 120000);
+  });
+});
+
 async function fetchFromWordPressAPI(url) {
   const response = await fetch(url);
   if (!response.ok) {
@@ -71,11 +79,15 @@ function sendToDiscord(submission) {
     embed.addField(`Player ${i}`, playerDetails, false);
   }
 
+  addReserveAndCoachFields(embed, submission);
+
   Object.keys(submission)
     .filter(
       (key) =>
         !hiddenFields.includes(key) &&
         !key.startsWith("player") &&
+        !key.startsWith("reserve_player") && // Yedek oyuncuları hariç tut
+        !key.startsWith("coach") && // Koçu hariç tut
         key !== "status" &&
         submission[key],
     )
@@ -89,11 +101,11 @@ function sendToDiscord(submission) {
       }
     });
 
-  embed.addField(
+  /*embed.addField(
     "Status",
     `${statusEmoji} ${submission.status.toUpperCase()}`,
     false,
-  );
+  );*/
 
   const row = new MessageActionRow().addComponents(
     new MessageButton()
@@ -110,13 +122,59 @@ function sendToDiscord(submission) {
   channel?.send({ embeds: [embed], components: [row] });
 }
 
-client.once("ready", () => {
-  console.log(`Logged in as ${client.user.tag}!`);
-  initializeLastFormTime().then(() => {
-    setInterval(checkForNewSubmission, 10000);
-    setInterval(checkAndAssignRoles, 50000);
+function addReserveAndCoachFields(embed, submission) {
+  // Yedek oyuncular için
+  if (submission.reserve_player1_fullname) {
+    const reservePlayerDetails =
+      `Full Name: ${submission.reserve_player1_fullname}\n` +
+      `IGN: ${submission.reserve_player1_ign}\n` +
+      `UID: ${submission.reserve_player1_uid}\n` +
+      `Email: ${submission.reserve_player1_email}\n` +
+      `Discord: ${submission.reserve_player1_discord}`;
+    embed.addField("Reserve Player 1", reservePlayerDetails, false);
+  }
+
+  // Koç için
+  if (submission.coach_fullname) {
+    const coachDetails =
+      `Full Name: ${submission.coach_fullname}\n` +
+      `Email: ${submission.coach_email}\n` +
+      `Discord: ${submission.coach_discord}`;
+    embed.addField("Coach", coachDetails, false);
+  }
+}
+
+async function assignRolesToMembers(guild, teamName, discordUsernames) {
+  let role = guild.roles.cache.find((r) => r.name === teamName);
+  if (!role) {
+    role = await guild.roles.create({ name: teamName });
+  }
+
+  for (const username of discordUsernames) {
+    const member = await findMemberByUsername(username);
+    if (member && !member.roles.cache.has(role.id)) {
+      await member.roles.add(role);
+    }
+  }
+}
+
+function extractUsernamesFromEmbed(embed) {
+  const usernames = [];
+  embed.fields.forEach((field) => {
+    if (field.value.includes("Discord:")) {
+      const discordLine = field.value
+        .split("\n")
+        .find((line) => line.includes("Discord:"));
+      if (discordLine) {
+        const username = discordLine.split(":")[1].trim();
+        if (username && username !== "N/A") {
+          usernames.push(username);
+        }
+      }
+    }
   });
-});
+  return usernames;
+}
 
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isButton()) return;
@@ -129,6 +187,7 @@ client.on("interactionCreate", async (interaction) => {
   const teamNameField = originalMessage.embeds[0].fields.find(
     (field) => field.name === "Team_name",
   );
+  const discordUsernames = extractUsernamesFromEmbed(originalMessage.embeds[0]);
 
   if (!teamNameField) {
     await interaction.reply({
@@ -139,7 +198,6 @@ client.on("interactionCreate", async (interaction) => {
   }
 
   const teamName = teamNameField.value;
-  const discordUsernames = [];
   for (let i = 1; i <= 4; i++) {
     const playerNameField = originalMessage.embeds[0].fields.find(
       (field) => field.name === `Player ${i}`,
@@ -156,9 +214,12 @@ client.on("interactionCreate", async (interaction) => {
     }
   }
 
+  await assignRolesToMembers(interaction.guild, teamName, discordUsernames);
+
   try {
     if (action === "approve") {
       await updateSubmissionStatus(submissionId, "approved");
+      updateMessageStatus(originalMessage, "approved");
       await moveAndEditMessage(
         originalMessage,
         APPROVED_CHANNEL_ID,
@@ -167,9 +228,7 @@ client.on("interactionCreate", async (interaction) => {
 
       let role = interaction.guild.roles.cache.find((r) => r.name === teamName);
       if (!role) {
-        role = await interaction.guild.roles.create({
-          name: teamName,
-        });
+        role = interaction.guild.roles.create({ name: teamName });
       }
 
       for (const username of discordUsernames) {
@@ -183,46 +242,52 @@ client.on("interactionCreate", async (interaction) => {
         (c) => c.name === teamName && c.type === "GUILD_CATEGORY",
       );
       if (!category) {
-        category = await interaction.guild.channels.create(teamName, {
+        category = interaction.guild.channels.create(teamName, {
           type: "GUILD_CATEGORY",
           permissionOverwrites: [
-            {
-              id: role.id,
-              allow: ["VIEW_CHANNEL"],
-            },
-            {
-              id: interaction.guild.roles.everyone,
-              deny: ["VIEW_CHANNEL"],
-            },
+            { id: role.id, allow: ["VIEW_CHANNEL"] },
+            { id: interaction.guild.roles.everyone, deny: ["VIEW_CHANNEL"] },
           ],
         });
       }
 
-      await interaction.guild.channels.create(`📜‎║‎chat‎║`, {
+      [role, category] = await Promise.all([role, category]);
+
+      const textChannel = interaction.guild.channels.create(`📜‎║‎chat‎║`, {
         type: "GUILD_TEXT",
         parent: category.id,
       });
 
-      await interaction.guild.channels.create(`🔊‎║‎voice‎║`, {
+      const voiceChannel = interaction.guild.channels.create(`🔊‎║‎voice‎║`, {
         type: "GUILD_VOICE",
         parent: category.id,
       });
+
+      await Promise.all([textChannel, voiceChannel]);
 
       await interaction.editReply({
         content: `Form approved, role '${teamName}' assigned, and team channels created.`,
         ephemeral: true,
       });
+      setTimeout(() => {
+        interaction.deleteReply().catch(console.error);
+      }, 10000);
     } else if (action === "reject") {
       await updateSubmissionStatus(submissionId, "rejected");
+      updateMessageStatus(originalMessage, "rejected");
       await moveAndEditMessage(
         originalMessage,
         REJECTED_CHANNEL_ID,
         "Rejected",
+        updateMessageStatus(originalMessage, "rejected"),
       );
       await interaction.editReply({
         content: "Form rejected and moved to the rejected channel.",
         ephemeral: true,
       });
+      setTimeout(() => {
+        interaction.deleteReply().catch(console.error);
+      }, 10000);
     }
   } catch (error) {
     console.error("Error in interaction:", error);
@@ -232,6 +297,21 @@ client.on("interactionCreate", async (interaction) => {
     });
   }
 });
+
+function updateMessageStatus(originalMessage, status) {
+  const color = status === "approved" ? "#57F287" : "#ED4245";
+  const emoji = status === "approved" ? "🟩" : "🔴";
+
+  const updatedEmbed = new MessageEmbed(originalMessage.embeds[0])
+    .setColor(color)
+    .spliceFields(0, 1, {
+      name: "Status",
+      value: `${emoji} ${status.toUpperCase()}`,
+      inline: false,
+    });
+
+  originalMessage.edit({ embeds: [updatedEmbed] });
+}
 
 async function moveAndEditMessage(originalMessage, targetChannelId, newStatus) {
   const color = newStatus === "Approved" ? "#57F287" : "#ED4245";
