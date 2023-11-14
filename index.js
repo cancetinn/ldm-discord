@@ -114,12 +114,14 @@ client.once("ready", () => {
   console.log(`Logged in as ${client.user.tag}!`);
   initializeLastFormTime().then(() => {
     setInterval(checkForNewSubmission, 10000);
-    setInterval(checkAndAssignRoles, 10000);
+    setInterval(checkAndAssignRoles, 50000);
   });
 });
 
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isButton()) return;
+
+  await interaction.deferReply();
 
   const [action, submissionId] = interaction.customId.split("_");
   const originalMessage = interaction.message;
@@ -137,19 +139,22 @@ client.on("interactionCreate", async (interaction) => {
   }
 
   const teamName = teamNameField.value;
-  const discordUsernames = [
-    "player1_discord",
-    "player2_discord",
-    "player3_discord",
-    "player4_discord",
-  ]
-    .map(
-      (field) =>
-        originalMessage.embeds[0].fields.find(
-          (f) => f.name.toLowerCase() === field,
-        )?.value,
-    )
-    .filter((username) => username);
+  const discordUsernames = [];
+  for (let i = 1; i <= 4; i++) {
+    const playerNameField = originalMessage.embeds[0].fields.find(
+      (field) => field.name === `Player ${i}`,
+    );
+    if (playerNameField && playerNameField.value.includes("Discord:")) {
+      const discordUsername = playerNameField.value
+        .split("\n")
+        .find((line) => line.startsWith("Discord:"))
+        .split(":")[1]
+        .trim();
+      if (discordUsername && discordUsername !== "N/A") {
+        discordUsernames.push(discordUsername);
+      }
+    }
+  }
 
   try {
     if (action === "approve") {
@@ -168,16 +173,9 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       for (const username of discordUsernames) {
-        const members = interaction.guild.members.cache.filter(
-          (m) => m.user.username === username,
-        );
-
-        if (members.size > 0) {
-          members.forEach(async (member) => {
-            await member.roles.add(role);
-          });
-        } else {
-          console.log(`User '${username}' not found in the guild.`);
+        const member = await findMemberByUsername(username);
+        if (member && !member.roles.cache.has(role.id)) {
+          await member.roles.add(role);
         }
       }
 
@@ -210,7 +208,7 @@ client.on("interactionCreate", async (interaction) => {
         parent: category.id,
       });
 
-      await interaction.reply({
+      await interaction.editReply({
         content: `Form approved, role '${teamName}' assigned, and team channels created.`,
         ephemeral: true,
       });
@@ -221,16 +219,15 @@ client.on("interactionCreate", async (interaction) => {
         REJECTED_CHANNEL_ID,
         "Rejected",
       );
-      await interaction.reply({
+      await interaction.editReply({
         content: "Form rejected and moved to the rejected channel.",
         ephemeral: true,
       });
     }
   } catch (error) {
     console.error("Error in interaction:", error);
-    await interaction.reply({
-      content:
-        "There was an error processing the form. Please try again later.",
+    await interaction.editReply({
+      content: `Form approved, role '${teamName}' assigned, and team channels created.`,
       ephemeral: true,
     });
   }
@@ -313,9 +310,7 @@ async function findOrCreateRole(teamName) {
 async function findMemberByUsername(username) {
   const guild = client.guilds.cache.get(process.env.GUILD_ID);
   const members = await guild.members.fetch();
-  return members.find(
-    (member) => member.user.username.toLowerCase() === username.toLowerCase(),
-  );
+  return members.find((member) => member.user.username === username);
 }
 
 client.login(process.env.CLIENT_BOT_TOKEN);
