@@ -51,8 +51,12 @@ async function checkForNewSubmission() {
 }
 
 function sendToDiscord(submission) {
+  const hiddenFields = ["id", "token"];
   const fields = Object.keys(submission)
-    .filter((key) => key !== "status" && submission[key])
+    .filter(
+      (key) =>
+        !hiddenFields.includes(key) && key !== "status" && submission[key],
+    )
     .map((key) => ({
       name: key.charAt(0).toUpperCase() + key.slice(1),
       value: String(submission[key]),
@@ -95,6 +99,7 @@ client.once("ready", () => {
   console.log(`Logged in as ${client.user.tag}!`);
   initializeLastFormTime().then(() => {
     setInterval(checkForNewSubmission, 10000);
+    setInterval(checkAndAssignRoles, 10000);
   });
 });
 
@@ -250,6 +255,52 @@ async function updateSubmissionStatus(submissionId, status) {
   if (!response.ok) {
     throw new Error(`HTTP error! Status: ${response.status}`);
   }
+}
+
+async function checkAndAssignRoles() {
+  const submissions = await fetchFromWordPressAPI(REST_API_URL);
+  submissions.forEach(async (submission) => {
+    if (submission.status === "approved") {
+      const teamName = submission.team_name;
+      let role = await findOrCreateRole(teamName);
+
+      const discordUsernames = [
+        "player1_discord",
+        "player2_discord",
+        "player3_discord",
+        "player4_discord",
+      ]
+        .map((field) => submission[field])
+        .filter((username) => username);
+
+      for (const username of discordUsernames) {
+        const member = await findMemberByUsername(username);
+        if (member && !member.roles.cache.has(role.id)) {
+          await member.roles.add(role);
+        }
+      }
+    }
+  });
+}
+
+async function findOrCreateRole(teamName) {
+  let role = client.guilds.cache
+    .get(process.env.GUILD_ID)
+    .roles.cache.find((r) => r.name === teamName);
+  if (!role) {
+    role = await client.guilds.cache.get(process.env.GUILD_ID).roles.create({
+      name: teamName,
+    });
+  }
+  return role;
+}
+
+async function findMemberByUsername(username) {
+  const guild = client.guilds.cache.get(process.env.GUILD_ID);
+  const members = await guild.members.fetch();
+  return members.find(
+    (member) => member.user.username.toLowerCase() === username.toLowerCase(),
+  );
 }
 
 client.login(process.env.CLIENT_BOT_TOKEN);
