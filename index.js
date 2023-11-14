@@ -52,33 +52,48 @@ async function checkForNewSubmission() {
 
 function sendToDiscord(submission) {
   const hiddenFields = ["id", "token"];
-  const fields = Object.keys(submission)
-    .filter(
-      (key) =>
-        !hiddenFields.includes(key) && key !== "status" && submission[key],
-    )
-    .map((key) => ({
-      name: key.charAt(0).toUpperCase() + key.slice(1),
-      value: String(submission[key]),
-      inline: false,
-    }));
-
   const color = submission.status === "approved" ? "#57F287" : "#1F8B4C";
   const statusEmoji = submission.status === "approved" ? "🟩" : "🔴";
 
   const embed = new MessageEmbed()
     .setTitle("New Form Submission")
     .setColor(color)
-    .addFields(fields)
     .setTimestamp(new Date(submission.time))
     .setFooter({ text: "LIDOMA BOT" });
 
-  if (["approved", "rejected"].includes(submission.status)) {
-    embed.addField(
-      "Status",
-      `${statusEmoji} ${submission.status.toUpperCase()}`,
-    );
+  for (let i = 1; i <= 4; i++) {
+    const playerDetails =
+      `Full Name: ${submission[`player${i}_fullname`] || "N/A"}\n` +
+      `IGN: ${submission[`player${i}_ign`] || "N/A"}\n` +
+      `UID: ${submission[`player${i}_uid`] || "N/A"}\n` +
+      `Email: ${submission[`player${i}_email`] || "N/A"}\n` +
+      `Discord: ${submission[`player${i}_discord`] || "N/A"}`;
+    embed.addField(`Player ${i}`, playerDetails, false);
   }
+
+  Object.keys(submission)
+    .filter(
+      (key) =>
+        !hiddenFields.includes(key) &&
+        !key.startsWith("player") &&
+        key !== "status" &&
+        submission[key],
+    )
+    .forEach((key) => {
+      if (key !== "time") {
+        embed.addField(
+          key.replace(/_/g, " ").charAt(0).toUpperCase() + key.slice(1),
+          String(submission[key]),
+          false,
+        );
+      }
+    });
+
+  embed.addField(
+    "Status",
+    `${statusEmoji} ${submission.status.toUpperCase()}`,
+    false,
+  );
 
   const row = new MessageActionRow().addComponents(
     new MessageButton()
