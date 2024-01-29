@@ -49,13 +49,21 @@ async function initializeLastFormTime() {
 }
 
 async function checkForNewSubmission() {
-  const submissions = await fetchFromWordPressAPI(`${REST_API_URL}?after=${lastFormTime}`);
-  submissions.forEach(submission => {
-    sendToDiscord(submission);
-    lastFormTime = submission.time;
-  });
-}
+  try {
+    const submissions = await fetchFromWordPressAPI(`${REST_API_URL}?after=${lastFormTime}`);
 
+    if (submissions.length > 0) {
+      submissions.forEach(submission => {
+        sendToDiscord(submission);
+      });
+
+      // En son gönderimin zamanını güncelle
+      lastFormTime = submissions[submissions.length - 1].time;
+    }
+  } catch (error) {
+    console.error('checkForNewSubmission error:', error);
+  }
+}
 
 function sendToDiscord(submission) {
   const hiddenFields = ["id", "token"];
