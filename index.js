@@ -28,7 +28,7 @@ let lastFormTime = "";
 client.once("ready", () => {
   console.log(`Logged in as ${client.user.tag}!`);
   initializeLastFormTime().then(() => {
-    setInterval(checkForNewSubmission, 25000);
+    setInterval(checkForNewSubmission, 20000);
     setInterval(checkAndAssignRoles, 150000);
   });
 });
@@ -49,19 +49,12 @@ async function initializeLastFormTime() {
 }
 
 async function checkForNewSubmission() {
-  try {
-    const submissions = await fetchFromWordPressAPI(`${REST_API_URL}?after=${lastFormTime}`);
-
-    if (submissions.length > 0) {
-      submissions.forEach(submission => {
-        sendToDiscord(submission);
-      });
-
-      // En son gönderimin zamanını güncelle
-      lastFormTime = submissions[submissions.length - 1].time;
+  const submissions = await fetchFromWordPressAPI(REST_API_URL);
+  for (const submission of submissions) {
+    if (new Date(submission.time) > new Date(lastFormTime)) {
+      lastFormTime = submission.time;
+      sendToDiscord(submission);
     }
-  } catch (error) {
-    console.error('checkForNewSubmission error:', error);
   }
 }
 
