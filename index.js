@@ -28,8 +28,8 @@ let lastFormTime = "";
 client.once("ready", () => {
   console.log(`Logged in as ${client.user.tag}!`);
   initializeLastFormTime().then(() => {
-    setInterval(checkForNewSubmission, 20000);
-    setInterval(checkAndAssignRoles, 150000);
+    setInterval(checkForNewSubmission, 10000);
+    setInterval(checkAndAssignRoles, 120000);
   });
 });
 
@@ -64,42 +64,42 @@ function sendToDiscord(submission) {
   const statusEmoji = submission.status === "approved" ? "🟩" : "🔴";
 
   const embed = new MessageEmbed()
-    .setTitle("New Form Submission")
-    .setColor(color)
-    .setTimestamp(new Date(submission.time))
-    .setFooter({ text: "LIDOMA BOT" });
+      .setTitle("New Form Submission")
+      .setColor(color)
+      .setTimestamp(new Date(submission.time))
+      .setFooter({ text: "LIDOMA BOT" });
 
   for (let i = 1; i <= 4; i++) {
     const playerDetails =
-      `Full Name: ${submission[`player${i}_fullname`] || "N/A"}\n` +
-      `IGN: ${submission[`player${i}_ign`] || "N/A"}\n` +
-      `UID: ${submission[`player${i}_uid`] || "N/A"}\n` +
-      `Email: ${submission[`player${i}_email`] || "N/A"}\n` +
-      `Discord: ${submission[`player${i}_discord`] || "N/A"}`;
+        `Full Name: ${submission[`player${i}_fullname`] || "N/A"}\n` +
+        `IGN: ${submission[`player${i}_ign`] || "N/A"}\n` +
+        `UID: ${submission[`player${i}_uid`] || "N/A"}\n` +
+        `Email: ${submission[`player${i}_email`] || "N/A"}\n` +
+        `Discord: ${submission[`player${i}_discord`] || "N/A"}`;
     embed.addField(`Player ${i}`, playerDetails, false);
   }
 
   addReserveAndCoachFields(embed, submission);
 
   Object.keys(submission)
-    .filter(
-      (key) =>
-        !hiddenFields.includes(key) &&
-        !key.startsWith("player") &&
-        !key.startsWith("reserve_player") && // Yedek oyuncuları hariç tut
-        !key.startsWith("coach") && // Koçu hariç tut
-        key !== "status" &&
-        submission[key],
-    )
-    .forEach((key) => {
-      if (key !== "time") {
-        embed.addField(
-          key.replace(/_/g, " ").charAt(0).toUpperCase() + key.slice(1),
-          String(submission[key]),
-          false,
-        );
-      }
-    });
+      .filter(
+          (key) =>
+              !hiddenFields.includes(key) &&
+              !key.startsWith("player") &&
+              !key.startsWith("reserve_player") && // Yedek oyuncuları hariç tut
+              !key.startsWith("coach") && // Koçu hariç tut
+              key !== "status" &&
+              submission[key],
+      )
+      .forEach((key) => {
+        if (key !== "time") {
+          embed.addField(
+              key.replace(/_/g, " ").charAt(0).toUpperCase() + key.slice(1),
+              String(submission[key]),
+              false,
+          );
+        }
+      });
 
   /*embed.addField(
     "Status",
@@ -108,14 +108,14 @@ function sendToDiscord(submission) {
   );*/
 
   const row = new MessageActionRow().addComponents(
-    new MessageButton()
-      .setCustomId("approve_" + submission.id)
-      .setLabel("Approve")
-      .setStyle("SUCCESS"),
-    new MessageButton()
-      .setCustomId("reject_" + submission.id)
-      .setLabel("Reject")
-      .setStyle("DANGER"),
+      new MessageButton()
+          .setCustomId("approve_" + submission.id)
+          .setLabel("Approve")
+          .setStyle("SUCCESS"),
+      new MessageButton()
+          .setCustomId("reject_" + submission.id)
+          .setLabel("Reject")
+          .setStyle("DANGER"),
   );
 
   const channel = client.channels.cache.get(CHANNEL_ID);
@@ -126,30 +126,30 @@ function addReserveAndCoachFields(embed, submission) {
   // Yedek oyuncular için
   if (submission.reserve_player1_fullname) {
     const reservePlayerDetails =
-      `Full Name: ${submission.reserve_player1_fullname}\n` +
-      `IGN: ${submission.reserve_player1_ign}\n` +
-      `UID: ${submission.reserve_player1_uid}\n` +
-      `Email: ${submission.reserve_player1_email}\n` +
-      `Discord: ${submission.reserve_player1_discord}`;
+        `Full Name: ${submission.reserve_player1_fullname}\n` +
+        `IGN: ${submission.reserve_player1_ign}\n` +
+        `UID: ${submission.reserve_player1_uid}\n` +
+        `Email: ${submission.reserve_player1_email}\n` +
+        `Discord: ${submission.reserve_player1_discord}`;
     embed.addField("Reserve Player 1", reservePlayerDetails, false);
   }
 
   if (submission.reserve_player2_fullname) {
-    const reservePlayerDetails2 =
+    const reservePlayer2Details =
         `Full Name: ${submission.reserve_player2_fullname}\n` +
         `IGN: ${submission.reserve_player2_ign}\n` +
         `UID: ${submission.reserve_player2_uid}\n` +
         `Email: ${submission.reserve_player2_email}\n` +
         `Discord: ${submission.reserve_player2_discord}`;
-    embed.addField("Reserve Player 2", reservePlayerDetails2, false);
+    embed.addField("Reserve Player 2", reservePlayer2Details, false);
   }
 
   // Koç için
   if (submission.coach_fullname) {
     const coachDetails =
-      `Full Name: ${submission.coach_fullname}\n` +
-      `Email: ${submission.coach_email}\n` +
-      `Discord: ${submission.coach_discord}`;
+        `Full Name: ${submission.coach_fullname}\n` +
+        `Email: ${submission.coach_email}\n` +
+        `Discord: ${submission.coach_discord}`;
     embed.addField("Coach", coachDetails, false);
   }
 }
@@ -173,8 +173,8 @@ function extractUsernamesFromEmbed(embed) {
   embed.fields.forEach((field) => {
     if (field.value.includes("Discord:")) {
       const discordLine = field.value
-        .split("\n")
-        .find((line) => line.includes("Discord:"));
+          .split("\n")
+          .find((line) => line.includes("Discord:"));
       if (discordLine) {
         const username = discordLine.split(":")[1].trim();
         if (username && username !== "N/A") {
@@ -195,7 +195,7 @@ client.on("interactionCreate", async (interaction) => {
   const originalMessage = interaction.message;
 
   const teamNameField = originalMessage.embeds[0].fields.find(
-    (field) => field.name === "Team_name",
+      (field) => field.name === "Team_name",
   );
   const discordUsernames = extractUsernamesFromEmbed(originalMessage.embeds[0]);
 
@@ -210,14 +210,14 @@ client.on("interactionCreate", async (interaction) => {
   const teamName = teamNameField.value;
   for (let i = 1; i <= 4; i++) {
     const playerNameField = originalMessage.embeds[0].fields.find(
-      (field) => field.name === `Player ${i}`,
+        (field) => field.name === `Player ${i}`,
     );
     if (playerNameField && playerNameField.value.includes("Discord:")) {
       const discordUsername = playerNameField.value
-        .split("\n")
-        .find((line) => line.startsWith("Discord:"))
-        .split(":")[1]
-        .trim();
+          .split("\n")
+          .find((line) => line.startsWith("Discord:"))
+          .split(":")[1]
+          .trim();
       if (discordUsername && discordUsername !== "N/A") {
         discordUsernames.push(discordUsername);
       }
@@ -231,9 +231,9 @@ client.on("interactionCreate", async (interaction) => {
       await updateSubmissionStatus(submissionId, "approved");
       updateMessageStatus(originalMessage, "approved");
       await moveAndEditMessage(
-        originalMessage,
-        APPROVED_CHANNEL_ID,
-        "Approved",
+          originalMessage,
+          APPROVED_CHANNEL_ID,
+          "Approved",
       );
 
       let role = interaction.guild.roles.cache.find((r) => r.name === teamName);
@@ -249,7 +249,7 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       let category = interaction.guild.channels.cache.find(
-        (c) => c.name === teamName && c.type === "GUILD_CATEGORY",
+          (c) => c.name === teamName && c.type === "GUILD_CATEGORY",
       );
       if (!category) {
         category = interaction.guild.channels.create(teamName, {
@@ -286,10 +286,10 @@ client.on("interactionCreate", async (interaction) => {
       await updateSubmissionStatus(submissionId, "rejected");
       updateMessageStatus(originalMessage, "rejected");
       await moveAndEditMessage(
-        originalMessage,
-        REJECTED_CHANNEL_ID,
-        "Rejected",
-        updateMessageStatus(originalMessage, "rejected"),
+          originalMessage,
+          REJECTED_CHANNEL_ID,
+          "Rejected",
+          updateMessageStatus(originalMessage, "rejected"),
       );
       await interaction.editReply({
         content: "Form rejected and moved to the rejected channel.",
@@ -313,12 +313,12 @@ function updateMessageStatus(originalMessage, status) {
   const emoji = status === "approved" ? "🟩" : "🔴";
 
   const updatedEmbed = new MessageEmbed(originalMessage.embeds[0])
-    .setColor(color)
-    .spliceFields(0, 1, {
-      name: "Status",
-      value: `${emoji} ${status.toUpperCase()}`,
-      inline: false,
-    });
+      .setColor(color)
+      .spliceFields(0, 1, {
+        name: "Status",
+        value: `${emoji} ${status.toUpperCase()}`,
+        inline: false,
+      });
 
   originalMessage.edit({ embeds: [updatedEmbed] });
 }
@@ -328,10 +328,10 @@ async function moveAndEditMessage(originalMessage, targetChannelId, newStatus) {
   const statusEmoji = newStatus === "Approved" ? "✅" : "❌";
 
   let statusField = originalMessage.embeds[0].fields.find(
-    (field) => field.name === "Status",
+      (field) => field.name === "Status",
   );
   const updatedEmbed = new MessageEmbed(originalMessage.embeds[0]).setColor(
-    color,
+      color,
   );
 
   if (statusField) {
@@ -372,8 +372,8 @@ async function checkAndAssignRoles() {
         "player3_discord",
         "player4_discord",
       ]
-        .map((field) => submission[field])
-        .filter((username) => username);
+          .map((field) => submission[field])
+          .filter((username) => username);
 
       for (const username of discordUsernames) {
         const member = await findMemberByUsername(username);
@@ -387,8 +387,8 @@ async function checkAndAssignRoles() {
 
 async function findOrCreateRole(teamName) {
   let role = client.guilds.cache
-    .get(process.env.GUILD_ID)
-    .roles.cache.find((r) => r.name === teamName);
+      .get(process.env.GUILD_ID)
+      .roles.cache.find((r) => r.name === teamName);
   if (!role) {
     role = await client.guilds.cache.get(process.env.GUILD_ID).roles.create({
       name: teamName,
