@@ -28,8 +28,8 @@ let lastFormTime = "";
 client.once("ready", () => {
   console.log(`Logged in as ${client.user.tag}!`);
   initializeLastFormTime().then(() => {
-    setInterval(checkForNewSubmission, 10000);
-    setInterval(checkAndAssignRoles, 120000);
+    setInterval(checkForNewSubmission, 25000);
+    setInterval(checkAndAssignRoles, 150000);
   });
 });
 
@@ -49,14 +49,13 @@ async function initializeLastFormTime() {
 }
 
 async function checkForNewSubmission() {
-  const submissions = await fetchFromWordPressAPI(REST_API_URL);
-  for (const submission of submissions) {
-    if (new Date(submission.time) > new Date(lastFormTime)) {
-      lastFormTime = submission.time;
-      sendToDiscord(submission);
-    }
-  }
+  const submissions = await fetchFromWordPressAPI(`${REST_API_URL}?after=${lastFormTime}`);
+  submissions.forEach(submission => {
+    sendToDiscord(submission);
+    lastFormTime = submission.time;
+  });
 }
+
 
 function sendToDiscord(submission) {
   const hiddenFields = ["id", "token"];
@@ -175,35 +174,6 @@ function extractUsernamesFromEmbed(embed) {
   });
   return usernames;
 }
-
-client.on('interactionCreate', async interaction => {
-  if (!interaction.isCommand()) return;
-
-  if (interaction.commandName === 'showprogress') {
-    try {
-      const response = await fetch(`${REST_API_URL}/form-data?status=progress`);
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
-      }
-      const submissions = await response.json();
-
-      if (submissions.length === 0) {
-        await interaction.reply('There are no submissions in progress.');
-        return;
-      }
-
-      for (const submission of submissions) {
-        sendToDiscord(submission); // Bu fonksiyon, mevcut kodunuzda zaten var
-      }
-
-      await interaction.reply('Displaying submissions in progress.');
-    } catch (error) {
-      console.error('Error:', error);
-      await interaction.reply('An error occurred while fetching submissions.');
-    }
-  }
-});
-
 
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isButton()) return;
