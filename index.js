@@ -134,6 +134,16 @@ function addReserveAndCoachFields(embed, submission) {
     embed.addField("Reserve Player 1", reservePlayerDetails, false);
   }
 
+  if (submission.reserve_player2_fullname) {
+    const reservePlayerDetails =
+        `Full Name: ${submission.reserve_player2_fullname}\n` +
+        `IGN: ${submission.reserve_player2_ign}\n` +
+        `UID: ${submission.reserve_player2_uid}\n` +
+        `Email: ${submission.reserve_player2_email}\n` +
+        `Discord: ${submission.reserve_player2_discord}`;
+    embed.addField("Reserve Player 2", reservePlayerDetails, false);
+  }
+
   // Koç için
   if (submission.coach_fullname) {
     const coachDetails =
