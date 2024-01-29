@@ -27,6 +27,8 @@ const REGISTER_CHANNEL_ID = process.env.REGISTER_CHANNEL_ID;
 let hasRegisterMessageBeenSent = false;
 let lastFormTime = "";
 const image_url = 'https://i.imgur.com/9aHnEm1.png';
+const link_url = 'https://latam.lidoma.com/';
+
 
 client.once("ready", () => {
   console.log(`Logged in as ${client.user.tag}!`);
@@ -54,9 +56,9 @@ async function sendRegisterMessageIfNeeded() {
 
     const row = new MessageActionRow().addComponents(
         new MessageButton()
-            .setCustomId('confirm_task')
+            .setURL(link_url)
             .setLabel('INSCREVA-SE')
-            .setStyle('SUCCESS')
+            .setStyle('LINK')
     );
 
     // Mesajı gönder
