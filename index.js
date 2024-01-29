@@ -230,12 +230,11 @@ client.on("interactionCreate", async (interaction) => {
     }
   }
 
-  await assignRolesToMembers(interaction.guild, teamName, discordUsernames);
-
   try {
     if (action === "approve") {
       await updateSubmissionStatus(submissionId, "approved");
       updateMessageStatus(originalMessage, "approved");
+      await assignRolesToMembers(interaction.guild, teamName, discordUsernames);
       await moveAndEditMessage(
           originalMessage,
           APPROVED_CHANNEL_ID,
