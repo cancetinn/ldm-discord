@@ -26,6 +26,7 @@ const REJECTED_CHANNEL_ID = process.env.REJECTED_CHANNEL_ID;
 const REGISTER_CHANNEL_ID = process.env.REGISTER_CHANNEL_ID;
 let hasRegisterMessageBeenSent = false;
 let lastFormTime = "";
+const image_url = 'https://i.imgur.com/9aHnEm1.png';
 
 client.once("ready", () => {
   console.log(`Logged in as ${client.user.tag}!`);
@@ -37,6 +38,7 @@ client.once("ready", () => {
 });
 
 async function sendRegisterMessageIfNeeded() {
+  const registerChannel = await client.channels.fetch(REGISTER_CHANNEL_ID);
   if (hasRegisterMessageBeenSent) return; // Eğer mesaj zaten gönderilmişse, işlemi yapma
 
   try {
@@ -45,15 +47,16 @@ async function sendRegisterMessageIfNeeded() {
 
     // Mesaj içeriğini ve butonu oluştur
     const embed = new MessageEmbed()
-        .setTitle("Hoş Geldiniz!")
-        .setDescription("Kayıt olmak için aşağıdaki butona tıklayın.")
-        .setColor("#0099ff");
+        .setTitle('LIDOMA CHALLENGE')
+        .setDescription('Para participar do torneio Lidoma Challenge, clique no botão INSCREVA-SE abaixo, preencha o formulário e faça sua inscrição!')
+        .setColor('#0099ff')
+        .setImage(image_url);
 
     const row = new MessageActionRow().addComponents(
         new MessageButton()
-            .setCustomId("register_button")
-            .setLabel("Kayıt Ol")
-            .setStyle("PRIMARY"),
+            .setCustomId('confirm_task')
+            .setLabel('INSCREVA-SE')
+            .setStyle('SUCCESS')
     );
 
     // Mesajı gönder
