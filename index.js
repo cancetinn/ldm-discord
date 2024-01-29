@@ -23,6 +23,8 @@ const UPDATE_API_URL = process.env.UPDATE_API_URL;
 const CHANNEL_ID = process.env.CHANNEL_ID;
 const APPROVED_CHANNEL_ID = process.env.APPROVED_CHANNEL_ID;
 const REJECTED_CHANNEL_ID = process.env.REJECTED_CHANNEL_ID;
+const REGISTER_CHANNEL_ID = process.env.REGISTER_CHANNEL_ID;
+let hasRegisterMessageBeenSent = false;
 let lastFormTime = "";
 
 client.once("ready", () => {
@@ -31,7 +33,37 @@ client.once("ready", () => {
     setInterval(checkForNewSubmission, 10000);
     setInterval(checkAndAssignRoles, 120000);
   });
+  sendRegisterMessageIfNeeded();
 });
+
+async function sendRegisterMessageIfNeeded() {
+  if (hasRegisterMessageBeenSent) return; // Eğer mesaj zaten gönderilmişse, işlemi yapma
+
+  try {
+    const registerChannel = await client.channels.fetch(REGISTER_CHANNEL_ID);
+    if (!registerChannel) return; // Eğer register kanalı bulunamazsa, işlemi yapma
+
+    // Mesaj içeriğini ve butonu oluştur
+    const embed = new MessageEmbed()
+        .setTitle("Hoş Geldiniz!")
+        .setDescription("Kayıt olmak için aşağıdaki butona tıklayın.")
+        .setColor("#0099ff");
+
+    const row = new MessageActionRow().addComponents(
+        new MessageButton()
+            .setCustomId("register_button")
+            .setLabel("Kayıt Ol")
+            .setStyle("PRIMARY"),
+    );
+
+    // Mesajı gönder
+    await registerChannel.send({ embeds: [embed], components: [row] });
+
+    hasRegisterMessageBeenSent = true; // Mesajın gönderildiğini işaretle
+  } catch (error) {
+    console.error("Hata oluştu: ", error);
+  }
+}
 
 async function fetchFromWordPressAPI(url) {
   const response = await fetch(url);
