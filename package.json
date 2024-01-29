@@ -4,7 +4,7 @@
   "description": "A Discord bot that posts form submissions to a channel",
   "main": "bot.js",
   "scripts": {
-    "start": "nodemon index.js"
+    "build": "node index.js"
   },
   "dependencies": {
     "discord.js": "^13.16.0",
