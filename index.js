@@ -48,6 +48,12 @@ async function initializeLastFormTime() {
   }
 }
 
+function convertToGMT3(dateString) {
+  const date = new Date(dateString);
+  const utcDate = new Date(date.getTime() + date.getTimezoneOffset() * 60000);
+  return new Date(utcDate.getTime() + (180 * 60000));
+}
+
 async function checkForNewSubmission() {
   const submissions = await fetchFromWordPressAPI(REST_API_URL);
   for (const submission of submissions) {
@@ -56,12 +62,6 @@ async function checkForNewSubmission() {
       sendToDiscord(submission);
     }
   }
-}
-
-function convertToGMT3(dateString) {
-  const date = new Date(dateString);
-  const utcDate = new Date(date.getTime() + date.getTimezoneOffset() * 60000);
-  return new Date(utcDate.getTime() - (180 * 60000));
 }
 
 function sendToDiscord(submission) {
@@ -233,22 +233,6 @@ client.on("interactionCreate", async (interaction) => {
   await assignRolesToMembers(interaction.guild, teamName, discordUsernames);
 
   try {
-    if (action === "reject") {
-      await updateSubmissionStatus(submissionId, "rejected");
-      updateMessageStatus(originalMessage, "rejected");
-      await moveAndEditMessage(originalMessage, REJECTED_CHANNEL_ID, "Rejected");
-
-      await interaction.editReply({
-        content: "Form rejected and moved to the rejected channel.",
-        ephemeral: true,
-      });
-      setTimeout(() => {
-        interaction.deleteReply().catch(console.error);
-      }, 10000);
-
-      return;
-    }
-
     if (action === "approve") {
       await updateSubmissionStatus(submissionId, "approved");
       updateMessageStatus(originalMessage, "approved");
