@@ -271,7 +271,6 @@ client.on("interactionCreate", async (interaction) => {
     if (action === "approve") {
       await updateSubmissionStatus(submissionId, "approved");
       updateMessageStatus(originalMessage, "approved");
-      await assignRolesToMembers(interaction.guild, teamName, discordUsernames);
       await moveAndEditMessage(
           originalMessage,
           APPROVED_CHANNEL_ID,
@@ -314,6 +313,8 @@ client.on("interactionCreate", async (interaction) => {
         type: "GUILD_VOICE",
         parent: category.id,
       });
+
+      await assignRolesToMembers(interaction.guild, teamName, discordUsernames);
 
       await Promise.all([textChannel, voiceChannel]);
 
